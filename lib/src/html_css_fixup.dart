@@ -74,11 +74,15 @@ Map createCssSimpleSelectors(IdClassVisitor visitedCss, ComponentInfo info,
   Map selectors = {};
   if (visitedCss != null) {
     for (var cssClass in visitedCss.classes) {
+      selectors['.$cssClass'] = cssClass;
+/*
       selectors['.$cssClass'] =
           scopedStyles ? '${info.tagName}_$cssClass' : cssClass;
+*/
     }
     for (var id in visitedCss.ids) {
-      selectors['#$id'] = scopedStyles ? '${info.tagName}_$id' : id;
+      selectors['#$id'] = id;
+//      selectors['#$id'] = scopedStyles ? '${info.tagName}_$id' : id;
     }
   }
 

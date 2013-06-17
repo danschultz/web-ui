@@ -57,6 +57,7 @@ class Compiler {
   final List<OutputFile> output = <OutputFile>[];
 
   String _mainPath;
+  String _resetCssFile;
   PathMapper _pathMapper;
   Messages _messages;
 
@@ -72,6 +73,7 @@ class Compiler {
  /** Creates a compiler with [options] using [fileSystem]. */
   Compiler(this.fileSystem, this.options, this._messages) {
     _mainPath = options.inputFile;
+    _resetCssFile = options.resetCssFile;
     var mainDir = path.dirname(_mainPath);
     var baseDir = options.baseDir != null ? options.baseDir : mainDir;
     var outputDir = options.outputDir != null ? options.outputDir : mainDir;
@@ -147,6 +149,12 @@ class Compiler {
         _pathMapper.packageRoot, _messages, isEntryPoint: isEntryPoint);
     });
     info[inputUrl.resolvedPath] = fileInfo;
+
+    if (isEntryPoint && _resetCssFile != null) {
+      _processed.add(_resetCssFile);
+      _tasks.add(_parseCssFile(new UrlInfo(_resetCssFile, _resetCssFile,
+          null)));
+    }
 
     _setOutputFilenames(fileInfo);
     _processImports(fileInfo);
@@ -546,12 +554,13 @@ class Compiler {
       _time('Codegen', file.path, () {
         var fileInfo = info[file.path];
         cleanHtmlNodes(fileInfo);
-        fixupHtmlCss(fileInfo, options);
+//        fixupHtmlCss(fileInfo, options);
         _emitComponents(fileInfo, pseudoElements);
       });
     }
 
     var entryPoint = files[0];
+var ii = info[entryPoint.path];
     assert(info[entryPoint.path].isEntryPoint);
     _emitMainDart(entryPoint);
     _emitMainHtml(entryPoint, pseudoElements);
@@ -646,6 +655,16 @@ class Compiler {
       }
     }
 
+    // Get reset file.
+    var cssResetStyleSheet;
+    if (_resetCssFile != null) {
+      var cssResetFile = files[1];
+      if (cssResetFile.isStyleSheet) {
+        var cssInfo = info[cssResetFile.path];
+        cssResetStyleSheet = cssInfo.styleSheets[0];
+      }
+    }
+
     // Emit all CSS for each component (style scoped).
     for (var file in files) {
       if (file.isHtml) {
@@ -667,6 +686,16 @@ class Compiler {
                 '/* ==================================================== \n'
                 '   Component ${component.tagName} stylesheet \n'
                 '   ==================================================== */\n');
+
+            if (!component.hasAuthorStyles && cssResetStyleSheet != null) {
+              // If component doesn't have apply-author-styles then we need to
+              // reset the CSS the styles for the component (if css-reset file
+              // option was passed).
+              buff.write('\n/* Start CSS Reset */\n');
+              buff.write(emitComponentStyleSheet(cssResetStyleSheet,
+                  component.tagName, null));
+              buff.write('/* End CSS Reset */\n\n');
+            }
             buff.write(emitComponentStyleSheet(styleSheet, component.tagName,
                 component.scoped ? component.tagName : null));
             buff.write('\n\n');
@@ -684,6 +713,16 @@ class Compiler {
 
   /** Emits the Dart code for all components in [fileInfo]. */
   void _emitComponents(FileInfo fileInfo, Map<String, String> pseudoElements) {
+    // Get reset file.
+    var cssReset;
+    if (_resetCssFile != null) {
+      var cssResetFile = files[1];
+      if (cssResetFile.isStyleSheet) {
+        var cssInfo = info[cssResetFile.path];
+        cssReset = cssInfo.styleSheets[0];
+      }
+    }
+
     for (var component in fileInfo.declaredComponents) {
       // TODO(terry): Handle one stylesheet per component see fixupHtmlCss.
       if (component.styleSheets.length > 1 && options.processCss) {
@@ -693,8 +732,9 @@ class Compiler {
             'Component has more than one stylesheet - first stylesheet used.',
             span);
       }
-      var printer = new WebComponentEmitter(fileInfo, _messages)
-          .run(component, _pathMapper, _edits[component.userCode]);
+      var printer = new WebComponentEmitter(fileInfo, _messages,
+          reset: cssReset).run(component, _pathMapper,
+          _edits[component.userCode]);
       _emitFileAndSourceMaps(component, printer, component.externalFile);
     }
   }

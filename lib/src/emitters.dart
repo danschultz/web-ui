@@ -462,24 +462,33 @@ class ComponentCssEmitter extends CssPrinter {
   }
 
   void visitClassSelector(ClassSelector node) {
+    emit('[is="$_componentTagName"] .${node.name}');
+/*
     if (_prefixed == null) {
       super.visitClassSelector(node);
     } else {
       emit('.${_prefixed}_${node.name}');
     }
+*/
   }
 
   void visitIdSelector(IdSelector node) {
+    emit('[is="$_componentTagName"] #${node.name}');
+/*
     if (_prefixed == null) {
       super.visitIdSelector(node);
     } else {
       emit('#${_prefixed}_${node.name}');
     }
+*/
   }
 
   void visitElementSelector(ElementSelector node) {
+    emit('[is="$_componentTagName"] ${node.name}');
+/*
     if (_emitComponentElement(node)) return;
     super.visitElementSelector(node);
+*/
   }
 }
 
@@ -498,9 +507,10 @@ String emitComponentStyleSheet(StyleSheet ss, String tagName, String prefix) =>
 /** Generates the class corresponding to a single web component. */
 class WebComponentEmitter extends RecursiveEmitter {
   final Messages messages;
+  final StyleSheet _reset;
 
-  WebComponentEmitter(FileInfo info, this.messages)
-      : super(info, new Context(isClass: true, indent: 1));
+  WebComponentEmitter(FileInfo info, this.messages, {StyleSheet reset: null})
+      : super(info, new Context(isClass: true, indent: 1)), _reset = reset;
 
   CodePrinter run(ComponentInfo info, PathMapper pathMapper,
       TextEditTransaction transaction) {
